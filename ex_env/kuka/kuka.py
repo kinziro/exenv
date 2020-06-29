@@ -89,8 +89,10 @@ class Kuka:
   def getObservation(self):
     observation = []
     state = p.getLinkState(self.kukaUid, self.kukaGripperIndex)
-    pos = state[0]
-    orn = state[1]
+    #pos = state[0]
+    #orn = state[1]
+    pos = state[4]
+    orn = state[5]
     euler = p.getEulerFromQuaternion(orn)
 
     observation.extend(list(pos))
@@ -111,9 +113,11 @@ class Kuka:
       fingerAngle = motorCommands[4]
 
       state = p.getLinkState(self.kukaUid, self.kukaEndEffectorIndex)
-      actualEndEffectorPos = state[0]
+      #actualEndEffectorPos = state[0]
       #print("pos[2] (getLinkState(kukaEndEffectorIndex)")
       #print(actualEndEffectorPos[2])
+
+      self.endEffectorPos = list(state[4])
 
       self.endEffectorPos[0] = self.endEffectorPos[0] + dx
       if (self.endEffectorPos[0] > 0.65):
