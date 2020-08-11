@@ -83,9 +83,12 @@ class KukaGymEnv(gym.Env):
     p.loadURDF(os.path.join(self._urdfRoot, "table/table.urdf"), 0.5000000, 0.00000, -.820000,
                0.000000, 0.000000, 0.0, 1.0)
 
-    xpos = 0.55 + 0.12 * random.random()
-    ypos = 0 + 0.2 * random.random()
-    ang = 3.14 * 0.5 + 3.1415925438 * random.random()
+    #xpos = 0.55 + 0.12 * random.random()
+    #ypos = 0 + 0.2 * random.random()
+    #ang = 3.14 * 0.5 + 3.1415925438 * random.random()
+    xpos = 0.55
+    ypos = 0
+    ang = 3.14 * 0.5
     orn = p.getQuaternionFromEuler([0, 0, ang])
     self.blockUid = p.loadURDF(os.path.join(self._urdfRoot, "block.urdf"), xpos, ypos, -0.15,
                                orn[0], orn[1], orn[2], orn[3])
@@ -107,8 +110,10 @@ class KukaGymEnv(gym.Env):
   def getExtendedObservation(self):
     self._observation = self._kuka.getObservation()
     gripperState = p.getLinkState(self._kuka.kukaUid, self._kuka.kukaGripperIndex)
-    gripperPos = gripperState[0]
-    gripperOrn = gripperState[1]
+    #gripperPos = gripperState[0]
+    #gripperOrn = gripperState[1]
+    gripperPos = gripperState[4]
+    gripperOrn = gripperState[5]
     blockPos, blockOrn = p.getBasePositionAndOrientation(self.blockUid)
 
     invGripperPos, invGripperOrn = p.invertTransform(gripperPos, gripperOrn)
@@ -132,11 +137,17 @@ class KukaGymEnv(gym.Env):
     #we return the relative x,y position and euler angle of block in gripper space
     blockInGripperPosXYEulZ = [blockPosInGripper[0], blockPosInGripper[1], blockEulerInGripper[2]]
 
+
     #p.addUserDebugLine(gripperPos,[gripperPos[0]+dir0[0],gripperPos[1]+dir0[1],gripperPos[2]+dir0[2]],[1,0,0],lifeTime=1)
     #p.addUserDebugLine(gripperPos,[gripperPos[0]+dir1[0],gripperPos[1]+dir1[1],gripperPos[2]+dir1[2]],[0,1,0],lifeTime=1)
     #p.addUserDebugLine(gripperPos,[gripperPos[0]+dir2[0],gripperPos[1]+dir2[1],gripperPos[2]+dir2[2]],[0,0,1],lifeTime=1)
 
-    self._observation.extend(list(blockInGripperPosXYEulZ))
+    # ---- 変更 ----
+    #self._observation.extend(list(blockInGripperPosXYEulZ))
+    blockEul = p.getEulerFromQuaternion(blockOrn)
+    self._observation.extend(list(blockPos))
+    self._observation.extend(list(blockEul))
+
     return self._observation
 
   def step(self, action):
