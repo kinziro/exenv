@@ -11,6 +11,7 @@ import numpy as np
 import time
 import pybullet as p
 from . import kuka
+#from pybullet_envs.bullet import kuka
 import random
 import pybullet_data
 from pkg_resources import parse_version
@@ -30,7 +31,7 @@ class KukaGymEnv(gym.Env):
                isEnableSelfCollision=True,
                renders=False,
                isDiscrete=False,
-               maxSteps=1000):
+               maxSteps=1500):
     #print("KukaGymEnv __init__")
     self._isDiscrete = isDiscrete
     self._timeStep = 1. / 240.
@@ -74,6 +75,7 @@ class KukaGymEnv(gym.Env):
 
   def reset(self):
     #print("KukaGymEnv _reset")
+    self._attempted_grasp = False
     self.terminated = 0
     p.resetSimulation()
     p.setPhysicsEngineParameter(numSolverIterations=150)
@@ -83,9 +85,6 @@ class KukaGymEnv(gym.Env):
     p.loadURDF(os.path.join(self._urdfRoot, "table/table.urdf"), 0.5000000, 0.00000, -.820000,
                0.000000, 0.000000, 0.0, 1.0)
 
-    #xpos = 0.55 + 0.12 * random.random()
-    #ypos = 0 + 0.2 * random.random()
-    #ang = 3.14 * 0.5 + 3.1415925438 * random.random()
     xpos = 0.55
     ypos = 0
     ang = 3.14 * 0.5
@@ -110,10 +109,8 @@ class KukaGymEnv(gym.Env):
   def getExtendedObservation(self):
     self._observation = self._kuka.getObservation()
     gripperState = p.getLinkState(self._kuka.kukaUid, self._kuka.kukaGripperIndex)
-    #gripperPos = gripperState[0]
-    #gripperOrn = gripperState[1]
-    gripperPos = gripperState[4]
-    gripperOrn = gripperState[5]
+    gripperPos = gripperState[0]
+    gripperOrn = gripperState[1]
     blockPos, blockOrn = p.getBasePositionAndOrientation(self.blockUid)
 
     invGripperPos, invGripperOrn = p.invertTransform(gripperPos, gripperOrn)
@@ -137,17 +134,11 @@ class KukaGymEnv(gym.Env):
     #we return the relative x,y position and euler angle of block in gripper space
     blockInGripperPosXYEulZ = [blockPosInGripper[0], blockPosInGripper[1], blockEulerInGripper[2]]
 
-
     #p.addUserDebugLine(gripperPos,[gripperPos[0]+dir0[0],gripperPos[1]+dir0[1],gripperPos[2]+dir0[2]],[1,0,0],lifeTime=1)
     #p.addUserDebugLine(gripperPos,[gripperPos[0]+dir1[0],gripperPos[1]+dir1[1],gripperPos[2]+dir1[2]],[0,1,0],lifeTime=1)
     #p.addUserDebugLine(gripperPos,[gripperPos[0]+dir2[0],gripperPos[1]+dir2[1],gripperPos[2]+dir2[2]],[0,0,1],lifeTime=1)
 
-    # ---- 変更 ----
-    #self._observation.extend(list(blockInGripperPosXYEulZ))
-    blockEul = p.getEulerFromQuaternion(blockOrn)
-    self._observation.extend(list(blockPos))
-    self._observation.extend(list(blockEul))
-
+    self._observation.extend(list(blockInGripperPosXYEulZ))
     return self._observation
 
   def step(self, action):
@@ -163,7 +154,7 @@ class KukaGymEnv(gym.Env):
       dv = 0.005
       dx = action[0] * dv
       dy = action[1] * dv
-      da = action[2] * 0.05
+      da = action[0] * 0.05
       f = 0.3
       realAction = [dx, dy, -0.002, da, f]
     return self.step2(realAction)
@@ -177,6 +168,33 @@ class KukaGymEnv(gym.Env):
       self._envStepCounter += 1
     if self._renders:
       time.sleep(self._timeStep)
+
+
+    # If we are close to the bin, attempt grasp.
+    state = p.getLinkState(self._kuka.kukaUid, self._kuka.kukaEndEffectorIndex)
+    end_effector_pos = state[0]
+    if end_effector_pos[2] <= 0.07:
+      finger_angle = 0.3
+      for _ in range(500):
+        grasp_action = [0, 0, 0, 0, finger_angle]
+        self._kuka.applyAction(grasp_action)
+        p.stepSimulation()
+        #if self._renders:
+        #  time.sleep(self._timeStep)
+        finger_angle -= 0.3 / 100.
+        if finger_angle < 0:
+          finger_angle = 0
+      for _ in range(500):
+        grasp_action = [0, 0, 0.001, 0, finger_angle]
+        self._kuka.applyAction(grasp_action)
+        p.stepSimulation()
+        if self._renders:
+          time.sleep(self._timeStep)
+        finger_angle -= 0.3 / 100.
+        if finger_angle < 0:
+          finger_angle = 0
+      self._attempted_grasp = True
+    
     self._observation = self.getExtendedObservation()
 
     #print("self._envStepCounter")
@@ -226,6 +244,9 @@ class KukaGymEnv(gym.Env):
     return rgb_array
 
   def _termination(self):
+    print(self._attempted_grasp, self._envStepCounter >= self._maxSteps)
+    return self._attempted_grasp or self._envStepCounter >= self._maxSteps
+    '''
     #print (self._kuka.endEffectorPos[2])
     state = p.getLinkState(self._kuka.kukaUid, self._kuka.kukaEndEffectorIndex)
     actualEndEffectorPos = state[0]
@@ -269,6 +290,7 @@ class KukaGymEnv(gym.Env):
       self._observation = self.getExtendedObservation()
       return True
     return False
+    '''
 
   def _reward(self):
 
