@@ -46,12 +46,37 @@ class Kuka:
     self.kukaUid = objects[0]
     #for i in range (p.getNumJoints(self.kukaUid)):
     #  print(p.getJointInfo(self.kukaUid,i))
-    p.resetBasePositionAndOrientation(self.kukaUid, [-0.100000, 0.000000, 0.070000],
-                                      [0.000000, 0.000000, 0.000000, 1.000000])
+    #p.resetBasePositionAndOrientation(self.kukaUid, [-0.100000, 0.000000, 0.070000],
+    #                                  [0.000000, 0.000000, 0.000000, 1.000000])
+    # デフォルトの初期位置
     self.jointPositions = [
         0.006418, 0.413184, -0.011401, -1.589317, 0.005379, 1.137684, -0.006539, 0.000048,
         -0.299912, 0.000000, -0.000043, 0.299960, 0.000000, -0.000200
     ]
+
+    ## 学習を早くするためにエンドエフェクターを200ステップの位置から開始
+    #self.jointPositions = [
+    #    0.005888340509955141, 0.5276178178901543, -0.010783121453282592, -1.6838850040809474, 
+    #    0.006766713219433872, 0.9301261439074936, -0.007469513419107962, -7.992282530189158e-07, 
+    #    -0.30000007779298543, 3.6333422493712676e-05, 0.2999963395720419, 3.212191726370148e-06,
+    #    0.000000, -0.000200
+    #]
+
+    ## 学習を早くするためにエンドエフェクターを500ステップの位置から開始
+    #self.jointPositions = [
+    #    .0040703623542216495, 0.7633847006452824, -0.008421964537224836, -1.7289035931100984, 
+    #    0.009623857991589947, 0.6493444330156685, -0.009679180251609507, -5.738645587907576e-07, 
+    #    -0.3000000056199837, 2.5873481445312556e-05, 0.2999978621771623, 2.2741090876842027e-06,
+    #    0.000000, -0.000200
+    #]
+
+    # 学習を早くするためにエンドエフェクターを700ステップの位置から開始
+    #self.jointPositions = [
+    #    0.002651, 0.950251, -0.006477, -1.694672, 0.011054, 0.496704, -0.010834, -5.83321e-07,
+    #    -0.299999, 2.6277754e-05, 0.2999978, 2.325971e-06, 0.000000, -0.000200
+    #]
+
+
     self.numJoints = p.getNumJoints(self.kukaUid)
     for jointIndex in range(self.numJoints):
       p.resetJointState(self.kukaUid, jointIndex, self.jointPositions[jointIndex])
@@ -61,8 +86,8 @@ class Kuka:
                               targetPosition=self.jointPositions[jointIndex],
                               force=self.maxForce)
 
-    self.trayUid = p.loadURDF(os.path.join(self.urdfRootPath, "tray/tray.urdf"), 0.640000,
-                              0.075000, -0.190000, 0.000000, 0.000000, 1.000000, 0.000000)
+    #self.trayUid = p.loadURDF(os.path.join(self.urdfRootPath, "tray/tray.urdf"), 0.640000,
+    #                          0.075000, -0.190000, 0.000000, 0.000000, 1.000000, 0.000000)
     self.endEffectorPos = [0.537, 0.0, 0.5]
     self.endEffectorAngle = 0
 
@@ -120,15 +145,15 @@ class Kuka:
       self.endEffectorPos = list(state[4])
 
       self.endEffectorPos[0] = self.endEffectorPos[0] + dx
-      if (self.endEffectorPos[0] > 0.65):
-        self.endEffectorPos[0] = 0.65
-      if (self.endEffectorPos[0] < 0.50):
-        self.endEffectorPos[0] = 0.50
+      #if (self.endEffectorPos[0] > 0.65):
+      #  self.endEffectorPos[0] = 0.65
+      #if (self.endEffectorPos[0] < 0.50):
+      #  self.endEffectorPos[0] = 0.50
       self.endEffectorPos[1] = self.endEffectorPos[1] + dy
-      if (self.endEffectorPos[1] < -0.17):
-        self.endEffectorPos[1] = -0.17
-      if (self.endEffectorPos[1] > 0.22):
-        self.endEffectorPos[1] = 0.22
+      #if (self.endEffectorPos[1] < -0.17):
+      #  self.endEffectorPos[1] = -0.17
+      #if (self.endEffectorPos[1] > 0.22):
+      #  self.endEffectorPos[1] = 0.22
 
       #print ("self.endEffectorPos[2]")
       #print (self.endEffectorPos[2])
@@ -162,7 +187,7 @@ class Kuka:
         else:
           jointPoses = p.calculateInverseKinematics(self.kukaUid, self.kukaEndEffectorIndex, pos)
 
-      #print("jointPoses")
+      #Eprint("jointPoses")
       #print(jointPoses)
       #print("self.kukaEndEffectorIndex")
       #print(self.kukaEndEffectorIndex)
