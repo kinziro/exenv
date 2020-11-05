@@ -63,6 +63,11 @@ class KukaGymEnv(gym.Env):
     else:
       p.connect(p.DIRECT)
     #timinglog = p.startStateLogging(p.STATE_LOGGING_PROFILE_TIMINGS, "kukaTimings.json")
+
+    self.action_dim = 1
+    #self.action_dim = 2
+    #sel.faction_dim = 3
+
     self.seed()
     self.reset()
     observationDim = len(self.getExtendedObservation())
@@ -73,11 +78,8 @@ class KukaGymEnv(gym.Env):
     if (self._isDiscrete):
       self.action_space = spaces.Discrete(7)
     else:
-      #action_dim = 1
-      #action_dim = 2
-      action_dim = 3
       self._action_bound = 1
-      action_high = np.array([self._action_bound] * action_dim)
+      action_high = np.array([self._action_bound] * self.action_dim)
       self.action_space = spaces.Box(-action_high, action_high)
     self.observation_space = spaces.Box(-observation_high, observation_high)
     self.viewer = None
@@ -104,10 +106,19 @@ class KukaGymEnv(gym.Env):
     #xpos = 0.55 + 0.12 * random.random()
     #xpos = 0.55 - 0.12 * random.random()
     #ypos = 0 + 0.2 * random.random()
-    xpos = 0.55 + 0.12 * (2 * random.random() -1)
-    ypos = 0 + 0.2 * (2 * random.random() -1)
-    ang = -np.pi * 0.5 + np.pi * random.random()
-    #ypos = 0
+
+    if self.action_dim == 1:
+      xpos = 0.55 + 0.12 * (2 * random.random() -1)
+      ypos = 0
+      ang = -np.pi * 0.5
+    elif self.action_dim == 2:
+      xpos = 0.55 + 0.12 * (2 * random.random() -1)
+      ypos = 0 + 0.2 * (2 * random.random() -1)
+      ang = -np.pi * 0.5
+    else:
+      xpos = 0.55 + 0.12 * (2 * random.random() -1)
+      ypos = 0 + 0.2 * (2 * random.random() -1)
+      ang = -np.pi * 0.5 + np.pi * random.random()
 
     self.init_blockPos = (xpos, ypos, ang)
 
@@ -204,13 +215,19 @@ class KukaGymEnv(gym.Env):
     else:
       #print("action[0]=", str(action[0]))
       dv = 0.005
-      dx = action[0] * dv
-      dy = action[1] * dv
-      da = action[2] * 0.05
-      #dx = 0
-      #dy = 0
-      #da = 0
-      #da = action[0] * 0.05
+      if self.action_dim == 1:
+        dx = action[0] * dv
+        dy = 0
+        da = 0
+      elif self.action_dim == 2:
+        dx = action[0] * dv
+        dy = action[1] * dv
+        da = 0
+      else:
+        dx = action[0] * dv
+        dy = action[1] * dv
+        da = action[2] * 0.05
+
       f = 0.3
       realAction = [dx, dy, -0.002, da, f]
     return self.step2(realAction)
