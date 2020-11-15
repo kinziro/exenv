@@ -31,7 +31,7 @@ class PointMassEnv(gym.Env):
         self.observation_space = spaces.Box(-self.observation_high, self.observation_high, shape=(len(obs),))
     
     def task_id_to_int(self, task_id):
-        task_int = np.argmax(np.array(task_id).reshape(1, -1), axis=1)
+        task_int = np.argmax(np.array(task_id).reshape(1, -1), axis=1)[0]
 
         return task_int
 
