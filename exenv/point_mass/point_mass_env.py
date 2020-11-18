@@ -5,7 +5,7 @@ import numpy as np
 import random
 
 class PointMassEnv(gym.Env):
-    def __init__(self, task_id=(0, 0)):
+    def __init__(self, task_id, goal_range=0.5, reward_range=1, terminal_timestep=28):
         task_int = self.task_id_to_int(task_id)
         if task_int in [0, 4]:
             self.goal = [3.5, 0]
@@ -20,9 +20,9 @@ class PointMassEnv(gym.Env):
         
         self.task_id = task_id
         self.task_int = task_int
-        self.goal_range = 0.5
-        self.reward_range = 1
-        self.terminal_time_step = 14
+        self.goal_range = goal_range
+        self.reward_range = reward_range
+        self.terminal_timestep = terminal_timestep
 
         self.action_high = 1
         self.observation_high = 100
@@ -63,7 +63,7 @@ class PointMassEnv(gym.Env):
         if reward < 0: reward = 0
 
 
-        if self.time_step >= self.terminal_time_step:
+        if self.time_step >= self.terminal_timestep:
             reward = -1000
             self.terminal = True
         else:
