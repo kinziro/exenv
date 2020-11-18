@@ -22,7 +22,7 @@ class PointMassEnv(gym.Env):
         self.task_int = task_int
         self.goal_range = 0.5
         self.reward_range = 1
-        self.terminal_time_step = 50
+        self.terminal_time_step = 14
 
         self.action_high = 1
         self.observation_high = 100
@@ -62,21 +62,23 @@ class PointMassEnv(gym.Env):
         reward = self.reward_range - dist
         if reward < 0: reward = 0
 
-        if dist <= self.goal_range:
-            reward = 1000
+
+        if self.time_step >= self.terminal_time_step:
+            reward = -1000
             self.terminal = True
-        
-        if self.time_step > self.terminal_time_step:
-            self.terminal = True
+        else:
+            if dist <= self.goal_range:
+                reward = 1000
+                self.terminal = True
         
         #reward *= 100
 
         return reward, self.terminal
     
     def get_obs(self):
-        obs = np.hstack([self.position, self.goal])
+        #obs = np.hstack([self.position, self.goal])
         #obs = self.goal - self.position
-        #obs = self.position
+        obs = self.position
         return obs
     
     def step(self, action):
