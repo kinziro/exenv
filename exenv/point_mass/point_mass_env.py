@@ -5,24 +5,13 @@ import numpy as np
 import random
 
 class PointMassEnv(gym.Env):
-    def __init__(self, task_id, goal_range=0.5, reward_range=1, terminal_timestep=28):
-        task_int = self.task_id_to_int(task_id)
-        if task_int in [0, 4]:
-            self.goal = [3.5, 0]
-        elif task_int in [1, 5]:
-            self.goal = [0, 3.5]
-        elif task_int in [2, 6]:
-            self.goal = [-3.5, 0]
-        elif task_int in [3, 7]:
-            self.goal = [0, -3.5]
-        else:
-            self.goal = [3.5, 0]
-        
+    def __init__(self, task_id, goal_range=0.5, reward_range=1, terminal_timestep=28, init_random=False):
         self.task_id = task_id
-        self.task_int = task_int
+        self.task_int = self.task_id_to_int(task_id)
         self.goal_range = goal_range
         self.reward_range = reward_range
         self.terminal_timestep = terminal_timestep
+        self.init_random = init_random
 
         self.action_high = 1
         self.observation_high = 100
@@ -34,11 +23,33 @@ class PointMassEnv(gym.Env):
         task_int = np.argmax(np.array(task_id).reshape(1, -1), axis=1)[0]
 
         return task_int
+    
+    def set_goal(self):
+        if self.task_int in [0, 4]:
+            self.goal = [3.5, 0]
+        elif self.task_int in [1, 5]:
+            self.goal = [0, 3.5]
+        elif self.task_int in [2, 6]:
+            self.goal = [-3.5, 0]
+        elif self.task_int in [3, 7]:
+            self.goal = [0, -3.5]
+        else:
+            self.goal = [3.5, 0]
 
-    def reset(self):
+    def reset(self, task_id=None):
+        if task_id is not None:
+            self.task_id = task_id
+            self.task_int = self.task_id_to_int(task_id)
+        self.set_goal()
+
+        if self.init_random:
+            x = self.goal[0] * random.randint(0, 1) * 2
+            y = self.goal[1] * random.randint(0, 1) * 2
+        else:
+            x = 0
+            y = 0
+
         #x = 7 * random.random() + 2
-        x = 0
-        y = 0
         #x = 5.5
         #y = 6 * random.random() - 3
         #x = 16 * random.random() - 8
@@ -110,7 +121,7 @@ class PointMassEnv(gym.Env):
     
 
 if __name__=="__main__":
-    env = PointMassEnv()
+    env = PointMassEnv((0, 0))
     obs = env.reset()
     print(obs)
 
