@@ -26,45 +26,42 @@ class PointMassEnv(gym.Env):
 
         return task_int, env_int
     
-    def set_goal(self, task_id):
+    def set_init(self, task_id):
         self.task_id = task_id
         self.task_int, self.env_int = self.task_id_to_int(task_id)
 
         if self.task_int in [0]:
-            self.goal = [2.5, 2.5]
+            self.goal = [3.5, 3.5]
         elif self.task_int in [1]:
-            self.goal = [-2.5, 2.5]
+            self.goal = [-3.5, 3.5]
         elif self.task_int in [2]:
-            self.goal = [-2.5, -2.5]
+            self.goal = [-3.5, -3.5]
         elif self.task_int in [3]:
-            self.goal = [2.5, -2.5]
+            self.goal = [3.5, -3.5]
         else:
-            self.goal = [2.5, 2.5]
+            self.goal = [3.5, 3.5]
         
         if self.env_int in [0]:
-            self.obs_x_coeff = 1
-            self.obs_y_coeff = 1
+            self.mean = np.array([0, 0])
+            self.std = np.array([[0.5, 0], [0, 0.5]])
         elif self.env_int in [1]:
-            self.obs_x_coeff = 0.5
-            self.obs_y_coeff = 1
+            self.mean = np.array([1, 0])
+            self.std = np.array([[0.5, 0], [0, 0.5]])
         elif self.env_int in [2]:
-            #self.obs_x_coeff = 0.3
-            self.obs_x_coeff = 1
-            self.obs_y_coeff = 0.5
+            self.mean = np.array([0, 1])
+            self.std = np.array([[0.5, 0], [0, 0.5]])
         elif self.env_int in [3]:
-            self.obs_x_coeff = 0.5
-            self.obs_y_coeff = 0.5
+            self.mean = np.array([1, 1])
+            self.std = np.array([[0.5, 0], [0, 0.5]])
         elif self.env_int in [4]:
-            #self.obs_x_coeff = 0.25
-            #self.obs_y_coeff = 0.25
-            self.obs_x_coeff = 0.75
-            self.obs_y_coeff = 0.75
+            self.mean = np.array([0.75, 0.75])
+            self.std = np.array([[0.5, 0], [0, 0.5]])
 
     def reset(self, task_id=None):
         if task_id is not None:
-            self.set_goal(task_id)
+            self.set_init(task_id)
         else:
-            self.set_goal(self.task_id)
+            self.set_init(self.task_id)
 
         if self.init_random:
             x = self.goal[0] * random.randint(0, 1) * 2
@@ -110,7 +107,8 @@ class PointMassEnv(gym.Env):
         goal_dist = np.linalg.norm(diff)
         line_dist = self.cal_distance_from_line(pos)
         
-        goal_reward = max(self.reward_range - goal_dist, 0)
+        #goal_reward = max(self.reward_range - goal_dist, 0)
+        goal_reward = 0.05 * max(self.reward_range - goal_dist, 0) / self.reward_range
         self.line_width = 0.5
         line_reward = max(self.line_width - line_dist, 0)
         #reward = goal_reward + (self.reward_range/self.line_width) * line_reward
@@ -120,14 +118,16 @@ class PointMassEnv(gym.Env):
 
         if self.terminal:
             if goal_dist <= self.goal_range:
-                reward = 1000
-                #reward = 70
+                reward = 1
+                #reward = 1000
             else:
                 #reward = -1000
                 reward = 0
             #elif line_dist > self.line_width:
             #    #reward = -50
             #    reward = 0
+        if reward > 1:
+            a = 1
 
         return reward, self.terminal, info
     
@@ -156,9 +156,10 @@ class PointMassEnv(gym.Env):
         return obs
     
     def transition(self, action):
-        self.obs_position += action
-        self.real_position[0] = self.obs_position[0] * self.obs_x_coeff
-        self.real_position[1] = self.obs_position[1] * self.obs_y_coeff
+        self.real_position += action
+        error = np.random.multivariate_normal(self.mean, self.std, size=1)
+        self.obs_position[0] = self.real_position[0] + error[0, 0]
+        self.obs_position[1] = self.real_position[1] + error[0, 1]
     
     def transition_filter_act(self, action):
         tra_action = action
