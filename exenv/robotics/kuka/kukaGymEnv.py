@@ -39,7 +39,8 @@ class KukaGymEnv(gym.Env):
                  isEnableSelfCollision=True,
                  renders=False,
                  isDiscrete=False,
-                 maxSteps=5000):
+                 maxSteps=5000,
+                 useInverseKinematics=True):
         #print("KukaGymEnv __init__")
         self._isDiscrete = isDiscrete
         self._timeStep = 1. / 240.
@@ -57,6 +58,7 @@ class KukaGymEnv(gym.Env):
         self._cam_yaw = 120
         #self._cam_pitch = -40
         self._cam_pitch = -20
+        self.useInverseKinematics = useInverseKinematics
 
         self._p = p
         if self._renders:
@@ -139,7 +141,8 @@ class KukaGymEnv(gym.Env):
 
         p.setGravity(0, 0, -10)
         self._kuka = kuka.Kuka(
-            urdfRootPath=self._urdfRoot, timeStep=self._timeStep)
+            urdfRootPath=self._urdfRoot, timeStep=self._timeStep,
+            useInverseKinematics=self.useInverseKinematics)
         self._envStepCounter = 0
         p.stepSimulation()
         self._observation = self.getExtendedObservation()
@@ -155,42 +158,42 @@ class KukaGymEnv(gym.Env):
     def getExtendedObservation(self):
         kuka_obs = self._kuka.getObservation()
         '''
-    gripperState = p.getLinkState(self._kuka.kukaUid, self._kuka.kukaGripperIndex)
-    gripperPos = gripperState[0]
-    gripperOrn = gripperState[1]
-    blockPos, blockOrn = p.getBasePositionAndOrientation(self.blockUid)
+        gripperState = p.getLinkState(self._kuka.kukaUid, self._kuka.kukaGripperIndex)
+        gripperPos = gripperState[0]
+        gripperOrn = gripperState[1]
+        blockPos, blockOrn = p.getBasePositionAndOrientation(self.blockUid)
 
-    blockEuler = p.getEulerFromQuaternion(blockOrn)
+        blockEuler = p.getEulerFromQuaternion(blockOrn)
 
-    invGripperPos, invGripperOrn = p.invertTransform(gripperPos, gripperOrn)
-    gripperMat = p.getMatrixFromQuaternion(gripperOrn)
-    dir0 = [gripperMat[0], gripperMat[3], gripperMat[6]]
-    dir1 = [gripperMat[1], gripperMat[4], gripperMat[7]]
-    dir2 = [gripperMat[2], gripperMat[5], gripperMat[8]]
+        invGripperPos, invGripperOrn = p.invertTransform(gripperPos, gripperOrn)
+        gripperMat = p.getMatrixFromQuaternion(gripperOrn)
+        dir0 = [gripperMat[0], gripperMat[3], gripperMat[6]]
+        dir1 = [gripperMat[1], gripperMat[4], gripperMat[7]]
+        dir2 = [gripperMat[2], gripperMat[5], gripperMat[8]]
 
-    gripperEul = p.getEulerFromQuaternion(gripperOrn)
-    #print("gripperEul")
-    #print(gripperEul)
-    blockPosInGripper, blockOrnInGripper = p.multiplyTransforms(invGripperPos, invGripperOrn,
-                                                                blockPos, blockOrn)
-    projectedBlockPos2D = [blockPosInGripper[0], blockPosInGripper[1]]
-    blockEulerInGripper = p.getEulerFromQuaternion(blockOrnInGripper)
-    #print("projectedBlockPos2D")
-    #print(projectedBlockPos2D)
-    #print("blockEulerInGripper")
-    #print(blockEulerInGripper)
+        gripperEul = p.getEulerFromQuaternion(gripperOrn)
+        #print("gripperEul")
+        #print(gripperEul)
+        blockPosInGripper, blockOrnInGripper = p.multiplyTransforms(invGripperPos, invGripperOrn,
+                                                                    blockPos, blockOrn)
+        projectedBlockPos2D = [blockPosInGripper[0], blockPosInGripper[1]]
+        blockEulerInGripper = p.getEulerFromQuaternion(blockOrnInGripper)
+        #print("projectedBlockPos2D")
+        #print(projectedBlockPos2D)
+        #print("blockEulerInGripper")
+        #print(blockEulerInGripper)
 
-    #we return the relative x,y position and euler angle of block in gripper space
-    blockInGripperPosXYEulZ = [blockPosInGripper[0], blockPosInGripper[1], blockEulerInGripper[2]]
+        #we return the relative x,y position and euler angle of block in gripper space
+        blockInGripperPosXYEulZ = [blockPosInGripper[0], blockPosInGripper[1], blockEulerInGripper[2]]
 
-    #p.addUserDebugLine(gripperPos,[gripperPos[0]+dir0[0],gripperPos[1]+dir0[1],gripperPos[2]+dir0[2]],[1,0,0],lifeTime=1)
-    #p.addUserDebugLine(gripperPos,[gripperPos[0]+dir1[0],gripperPos[1]+dir1[1],gripperPos[2]+dir1[2]],[0,1,0],lifeTime=1)
-    #p.addUserDebugLine(gripperPos,[gripperPos[0]+dir2[0],gripperPos[1]+dir2[1],gripperPos[2]+dir2[2]],[0,0,1],lifeTime=1)
+        #p.addUserDebugLine(gripperPos,[gripperPos[0]+dir0[0],gripperPos[1]+dir0[1],gripperPos[2]+dir0[2]],[1,0,0],lifeTime=1)
+        #p.addUserDebugLine(gripperPos,[gripperPos[0]+dir1[0],gripperPos[1]+dir1[1],gripperPos[2]+dir1[2]],[0,1,0],lifeTime=1)
+        #p.addUserDebugLine(gripperPos,[gripperPos[0]+dir2[0],gripperPos[1]+dir2[1],gripperPos[2]+dir2[2]],[0,0,1],lifeTime=1)
 
-    #self._observation.extend(list(blockInGripperPosXYEulZ))
-    #self._observation = self._observation[:2]
-    #self._observation.extend(blockPos[:2])
-    '''
+        #self._observation.extend(list(blockInGripperPosXYEulZ))
+        #self._observation = self._observation[:2]
+        #self._observation.extend(blockPos[:2])
+        '''
         block_pos, block_orn = p.getBasePositionAndOrientation(self.blockUid)
         block_euler = p.getEulerFromQuaternion(block_orn)
         diff_xy = np.array(block_pos[:2]) - np.array(kuka_obs[:2])
