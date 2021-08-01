@@ -38,13 +38,15 @@ A_COEFF = 10
 class BaseTask(gym.Env):
 
     def __init__(self, robot,
-                 action_repeat=1, time_step=1./240., max_steps=5000):
+                 action_repeat=1, time_step=1./240., max_steps=5000,
+                 render=False):
         self._time_step = time_step
         self._robot = robot
         self._action_filters = self._create_action_filters
         self._observation_filters = self._create_observation_filters
         self._action_repeat = action_repeat
         self._max_steps = max_steps
+        self._render = render
 
         self._robot.reset()
         self.action_dim = self._robot.get_action_dim()
@@ -54,8 +56,14 @@ class BaseTask(gym.Env):
         self._action_filters = self._create_action_filters()
         self._observation_filters = self._create_observation_filters()
 
-    def _connect_with_pybullet(self, time_step):
-        p.connect(p.DIRECT)
+    def _connect_with_pybullet(self, time_step, render):
+        if render:
+            cid = p.connect(p.SHARED_MEMORY)
+            if (cid < 0):
+                cid = p.connect(p.GUI)
+            p.resetDebugVisualizerCamera(1.3, 180, -41, [0.52, -0.2, -0.33])
+        else:
+            p.connect(p.DIRECT)
         p.setPhysicsEngineParameter(numSolverIterations=150)
         p.setTimeStep(time_step)
         p.stepSimulation()
@@ -119,7 +127,8 @@ class LiftBlock(BaseTask):
                  urdf_root=pybullet_data.getDataPath(),
                  action_repeat=1,
                  time_step=1./240.,
-                 max_steps=5000):
+                 max_steps=5000,
+                 ):
         self._urdf_root = urdf_root
         # self._cam_dist = 1.3
         self._cam_dist = 1.5
