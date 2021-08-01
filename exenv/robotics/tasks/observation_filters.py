@@ -33,7 +33,7 @@ class CalEndEffectorRelativeEulerAngle:
             = np.array(info["target_euler"]) \
             - np.array(info["endeffector_euler"])
 
-        rel_angle = rel_angle & (2 * np.pi)
+        rel_angle = rel_angle % (2 * np.pi)
 
         info["rel_angle"] = rel_angle
 

@@ -50,12 +50,14 @@ class KukaBase(RobotBase):
         ]
         body_path = os.path.join(urdf_root_path,
                                  "kuka_iiwa/kuka_with_gripper2.sdf")
-        super().__init__(body_path, init_joint_positions, time_step, action_dim)
+        super().__init__(body_path, init_joint_positions, time_step,
+                         action_dim)
 
     def reset(self):
-        super().reset()
         self.endEffectorPos = [0.537, 0.0, 0.5]
         self.endEffectorAngle = 0
+
+        super().reset()
 
     def apply_action(self, action):
         raise NotImplementedError
@@ -79,6 +81,10 @@ class KukaInverseKinematics(KukaBase):
         info['endeffector_euler'] = list(euler)
 
         return info
+
+    def get_observation_dim(self):
+        state = self.get_state()
+        return len(state)
 
     def apply_action(self, action):
 

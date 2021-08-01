@@ -30,7 +30,8 @@ class RobotBase:
         self._action_dim = len(
             self.motor_indices) if action_dim is None else action_dim
 
-        self.reset()
+        # set init pos
+        self._set_joint_pos(self.num_joints, self.init_joint_positions)
 
     def _load_body(self, full_path):
         filepath = os.path.basename(full_path)
@@ -63,7 +64,7 @@ class RobotBase:
     # def get_observation_dim(self):
     #     return len(self.get_bservation())
 
-    def get_observation(self):
+    def get_observation_dim(self):
         raise NotImplementedError
 
     def apply_action(self, action):

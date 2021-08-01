@@ -6,7 +6,6 @@ from .observation_filters import (GetTargetPosAndOrn,
 from pkg_resources import parse_version
 import pybullet_data
 import random
-from . import kuka
 import copy
 import pybullet as p
 import time
@@ -39,21 +38,27 @@ A_COEFF = 10
 class BaseTask(gym.Env):
 
     def __init__(self, robot,
-                 action_repeat=1, max_steps=5000):
-        self._time_step = 1. / 240.
+                 action_repeat=1, time_step=1./240., max_steps=5000):
+        self._time_step = time_step
         self._robot = robot
         self._action_filters = self._create_action_filters
         self._observation_filters = self._create_observation_filters
         self._action_repeat = action_repeat
         self._max_steps = max_steps
 
-        # connect with pybullet
+        self._robot.reset()
+        self.action_dim = self._robot.get_action_dim()
+        self.observation_dim = self._robot.get_observation_dim()
+
+        # set filters
+        self._action_filters = self._create_action_filters()
+        self._observation_filters = self._create_observation_filters()
+
+    def _connect_with_pybullet(self, time_step):
         p.connect(p.DIRECT)
         p.setPhysicsEngineParameter(numSolverIterations=150)
-        p.setTimeStep(self._time_step)
+        p.setTimeStep(time_step)
         p.stepSimulation()
-
-        self.reset()
 
     def _create_action_filters(self):
         return []
@@ -63,7 +68,7 @@ class BaseTask(gym.Env):
 
     def reset(self):
         # reset pybullet
-        p.resetSimulation()
+        # p.resetSimulation()
 
         # reset variable
         self._env_step_counter = 0
@@ -71,10 +76,6 @@ class BaseTask(gym.Env):
         # reset robot
         self._robot.reset()
         obs, _, _, _ = self._get_observation()
-
-        # reset filters
-        self._action_filters = self._create_action_filters
-        self._observation_filters = self._create_observation_filters
 
         return np.array(obs)
 
@@ -84,7 +85,7 @@ class BaseTask(gym.Env):
             action = action_filter(action)
 
         for _ in range(self._action_repeat):
-            self._robot._apply_action(action)
+            self._robot.apply_action(action)
             if self._termination():
                 break
             self._env_step_counter += 1
@@ -97,16 +98,19 @@ class BaseTask(gym.Env):
         pass
 
     def _get_observation(self, specific_action=None):
-        info = self._robot._get_state()
+        info = self._robot.get_state()
         obs, reward, done = [], 0, False
 
         # task-specific actions
-        self._specific_action(info)
+        if specific_action is not None:
+            self._specific_action(info)
 
         for observation_filter in self._observation_filters:
             obs, reward, done, info \
                 = observation_filter(obs, reward, done, info)
         done = self._termination() or done
+
+        return obs, reward, done, info
 
 
 class LiftBlock(BaseTask):
@@ -114,6 +118,7 @@ class LiftBlock(BaseTask):
                  robot,
                  urdf_root=pybullet_data.getDataPath(),
                  action_repeat=1,
+                 time_step=1./240.,
                  max_steps=5000):
         self._urdf_root = urdf_root
         # self._cam_dist = 1.3
@@ -122,6 +127,7 @@ class LiftBlock(BaseTask):
         self._cam_yaw = 120
         # self._cam_pitch = -40
         self._cam_pitch = -20
+        self._lim_z = 0.28
 
         self.seed()
 
@@ -130,20 +136,16 @@ class LiftBlock(BaseTask):
                    [0.5, 0.0, -0.62],
                    [0.000000, 0.000000, 0.0, 1.0])
 
-        super.__init__(robot, action_repeat, max_steps)
+        # reset block
+        self.block_id, self.init_block_pos, self.init_block_orn \
+            = self.load_block()
 
-        self.action_dim = self._robot.getActionDimension()
-        observationDim = len(self.getExtendedObservation())
-        # print("observationDim")
-        # print(observationDim)
+        super().__init__(robot, action_repeat, time_step, max_steps)
 
-        observation_high = np.array([largeValObservation] * observationDim)
-        if (self._isDiscrete):
-            self.action_space = spaces.Discrete(7)
-        else:
-            self._action_bound = 1
-            action_high = np.array([self._action_bound] * self.action_dim)
-            self.action_space = spaces.Box(-action_high, action_high)
+        observation_high \
+            = np.array([1] * self.observation_dim)
+        action_high = np.array([1] * self.action_dim)
+        self.action_space = spaces.Box(-action_high, action_high)
         self.observation_space = spaces.Box(-observation_high,
                                             observation_high)
 
@@ -161,34 +163,52 @@ class LiftBlock(BaseTask):
         self._attempted_grasp = False
 
         # reset block
-        self.block_id, self.init_block_pos = self.reset_block()
+        self.init_block_pos, self.init_block_orn = self.reset_block()
 
         # reset super class
-        obs = super.reset()
+        obs = super().reset()
 
         return obs
 
-    def reset_block(self):
-        if self.action_dim == 1:
-            xpos = 0.55 + 0.12 * (2 * random.random() - 1)
-            ypos = 0
-            ang = -np.pi * 0.5
-        elif self.action_dim == 2:
-            xpos = 0.55 + 0.12 * (2 * random.random() - 1)
-            ypos = 0 + 0.2 * (2 * random.random() - 1)
-            ang = -np.pi * 0.5
-        else:
-            xpos = 0.55 + 0.12 * (2 * random.random() - 1)
-            ypos = 0 + 0.2 * (2 * random.random() - 1)
-            ang = -np.pi * 0.5 + np.pi * random.random()
+    def cal_block_pos_and_orn(self):
+        # if self.action_dim == 1:
+        #     xpos = 0.55 + 0.12 * (2 * random.random() - 1)
+        #     ypos = 0
+        #     ang = -np.pi * 0.5
+        # elif self.action_dim == 2:
+        #     xpos = 0.55 + 0.12 * (2 * random.random() - 1)
+        #     ypos = 0 + 0.2 * (2 * random.random() - 1)
+        #     ang = -np.pi * 0.5
+        # else:
+        #     xpos = 0.55 + 0.12 * (2 * random.random() - 1)
+        #     ypos = 0 + 0.2 * (2 * random.random() - 1)
+        #     ang = -np.pi * 0.5 + np.pi * random.random()
 
-        init_block_pos = (xpos, ypos, ang)
+        x = 0.55
+        y = 0
+        z = 0.02
+        ang = -np.pi * 0.5
+
+        pos = (x, y, z)
         orn = p.getQuaternionFromEuler([0, 0, ang])
+
+        return pos, orn
+
+    def load_block(self):
+        pos, orn = self.cal_block_pos_and_orn()
+
         block_id = p.loadURDF(os.path.join(self._urdf_root, "block.urdf"),
-                              xpos, ypos, 0.02,
+                              pos[0], pos[1], pos[2],
                               orn[0], orn[1], orn[2], orn[3])
 
-        return block_id, init_block_pos
+        return block_id, pos, orn
+
+    def reset_block(self):
+        pos, orn = self.cal_block_pos_and_orn()
+
+        p.resetBasePositionAndOrientation(self.block_id, pos, orn)
+
+        return pos, orn
 
     def __del__(self):
         p.disconnect()

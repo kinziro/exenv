@@ -8,6 +8,9 @@ class LiftBlockWithKukaInverseKinematics(LiftBlock):
     def __init__(self,
                  urdf_root=pybullet_data.getDataPath(),
                  action_repeat=1,
-                 max_steps=5000):
+                 time_step=1./240.,
+                 max_steps=5000,
+                 ):
+        self._connect_with_pybullet(time_step)
         robot = KukaInverseKinematics()
-        super().__init__(robot, urdf_root, action_repeat, max_steps)
+        super().__init__(robot, urdf_root, action_repeat, time_step, max_steps)
