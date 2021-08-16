@@ -34,8 +34,21 @@ class CalEndEffectorRelativeEulerAngle:
             - np.array(info["endeffector_euler"])
 
         rel_angle = rel_angle % (2 * np.pi)
+        rel_angle[2] -= 0.5 * np.pi       # 元々のズレを引いて基準角度を0にする
 
         info["rel_angle"] = rel_angle
+
+        return obs, reward, done, info
+
+
+class NormalizeRelativeValue:
+    def __init__(self, coeff_pos=100, coeff_angle=10):
+        self.coeff_pos = coeff_pos
+        self.coeff_angle = coeff_angle
+
+    def __call__(self, obs, reward, done, info):
+        info["norm_rel_pos"] = info["rel_pos"] * self.coeff_pos
+        info["norm_rel_angle"] = info["rel_angle"] * self.coeff_angle
 
         return obs, reward, done, info
 
@@ -43,8 +56,8 @@ class CalEndEffectorRelativeEulerAngle:
 class FormatKukaInverseKinematics:
     def __call__(self, obs, reward, done, info):
         obs = []
-        obs.extend(info["rel_pos"].tolist()[:2])        # xy
-        obs.extend(info["rel_angle"].tolist()[2:])      # yaw
+        obs.extend(info["norm_rel_pos"].tolist()[:2])        # xy
+        obs.extend(info["norm_rel_angle"].tolist()[2:])      # yaw
 
         return obs, reward, done, info
 

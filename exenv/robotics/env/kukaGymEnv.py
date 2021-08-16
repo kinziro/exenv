@@ -23,5 +23,5 @@ class LiftBlockWithKukaInverseKinematics(LiftBlock):
             render (bool, optional): whether show GUI
         '''
         self._connect_with_pybullet(time_step, render)
-        robot = KukaInverseKinematics()
+        robot = KukaInverseKinematics(action_dim=2)
         super().__init__(robot, urdf_root, action_repeat, time_step, max_steps)
