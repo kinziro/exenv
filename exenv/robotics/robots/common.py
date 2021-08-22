@@ -25,10 +25,14 @@ class RobotBase:
     def _load_body(self, full_path):
         filepath = os.path.basename(full_path)
         if "sdf" in filepath:
-            objects = p.loadSDF(full_path)
+            id = p.loadSDF(full_path)[0]
         elif "urdf" in filepath:
-            objects = p.loadURDF(full_path)
-        return objects[0]
+            # objects = p.loadURDF(full_path)
+            # objects = p.loadURDF(os.path.join(os.getcwd(),self.robotUrdfPath), self.robotStartPos, self.robotStartOrn,
+            #                     flags=p.URDF_USE_INERTIA_FROM_FILE)
+            id = p.loadURDF(full_path,
+                            flags=p.URDF_USE_INERTIA_FROM_FILE)
+        return id
 
     def _make_robot(self, body_path):
         # load body

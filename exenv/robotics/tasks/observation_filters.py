@@ -67,7 +67,7 @@ class LiftBlockReward:
         # reward = -1000
         block_pos = info['target_pos']
 
-        diff_xy = info['rel_pos']
+        diff_xy = info['rel_pos'][:2]
         # xy_distance = np.linalg.norm(diff_xy) / X_COEFF
         xy_distance = np.linalg.norm(diff_xy)
         # a_diff = obs[2] / A_COEFF

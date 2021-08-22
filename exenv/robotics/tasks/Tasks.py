@@ -161,7 +161,7 @@ class LiftBlock(BaseTask):
                          action_repeat, time_step, max_steps)
 
         observation_high \
-            = np.array([50, 50, 3.2])
+            = np.array([200, 200, 3.2])
         action_high = np.array([1] * self.action_dim)
         self.action_space = spaces.Box(-action_high, action_high,
                                        shape=(self.action_dim,))

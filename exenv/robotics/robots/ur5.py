@@ -1,3 +1,4 @@
+from ..urdf.common import get_urdf_dir_path
 from .common import RobotBase
 import pybullet_data
 import math
@@ -55,12 +56,20 @@ class Ur5Base(RobotBase):
     def __init__(self, urdf_root_path=pybullet_data.getDataPath(),
                  time_step=0.01,
                  action_dim=None):
-        body_path = "../urdf/real_arm.urdf"
+        #body_path = "../urdf/ur5_arm.urdf"
+        urdf_path = get_urdf_dir_path()
+        body_path = os.path.join(urdf_path, "ur5_arm.urdf")
         self.robotStartPos = [0.0, 0.0, 0.0]
         self.robotStartOrn = p.getQuaternionFromEuler([1.885, 1.786, 0.132])
 
         self.lastJointAngle = None
         self.active = False
+
+        n_robot_joints = 6
+
+        body_id, self.motor_names, self.motor_indices \
+            = self._make_robot(body_path)
+        a = 1
 
         # if real:
         #     self.s = init_socket()
@@ -122,199 +131,199 @@ class Ur5Base(RobotBase):
         raise NotImplementedError
 
 
-class KukaInverseKinematics(KukaBase):
-    def __init__(self, urdf_root_path=pybullet_data.getDataPath(),
-                 time_step=0.01, action_dim=5):
-        super().__init__(urdf_root_path, time_step, action_dim)
-
-    def get_state(self):
-        info = {}
-        state = p.getLinkState(self.body_id, self.GripperIndex)
-        #pos = state[0]
-        #orn = state[1]
-        pos = state[4]
-        orn = state[5]
-        euler = p.getEulerFromQuaternion(orn)
-
-        info['endeffector_pos'] = list(pos)
-        info['endeffector_euler'] = list(euler)
-
-        return info
-
-    def get_observation_dim(self):
-        state = self.get_state()
-        return len(state)
-
-    def apply_action(self, action):
-
-        dx = action[0]
-        dy = action[1]
-        dz = action[2]
-        da = action[3]
-        fingerAngle = action[4]
-
-        state = p.getLinkState(self.body_id, self.EndEffectorIndex)
-        #actualEndEffectorPos = state[0]
-        #print("pos[2] (getLinkState(EndEffectorIndex)")
-        # print(actualEndEffectorPos[2])
-
-        self.endEffectorPos = list(state[4])
-
-        self.endEffectorPos[0] = self.endEffectorPos[0] + dx
-        # if (self.endEffectorPos[0] > 0.65):
-        #  self.endEffectorPos[0] = 0.65
-        # if (self.endEffectorPos[0] < 0.50):
-        #  self.endEffectorPos[0] = 0.50
-        self.endEffectorPos[1] = self.endEffectorPos[1] + dy
-        # if (self.endEffectorPos[1] < -0.17):
-        #  self.endEffectorPos[1] = -0.17
-        # if (self.endEffectorPos[1] > 0.22):
-        #  self.endEffectorPos[1] = 0.22
-
-        #print ("self.endEffectorPos[2]")
-        #print (self.endEffectorPos[2])
-        # print("actualEndEffectorPos[2]")
-        # print(actualEndEffectorPos[2])
-        # if (dz<0 or actualEndEffectorPos[2]<0.5):
-        self.endEffectorPos[2] = self.endEffectorPos[2] + dz
-
-        self.endEffectorAngle = self.endEffectorAngle + da
-        pos = self.endEffectorPos
-        orn = p.getQuaternionFromEuler([0, -math.pi, 0])  # -math.pi,yaw])
-        if (self.useNullSpace == 1):
-            if (self.useOrientation == 1):
-                jointPoses = p.calculateInverseKinematics(self.body_id,
-                                                          self.EndEffectorIndex,
-                                                          pos,
-                                                          orn, self.ll,
-                                                          self.ul, self.jr,
-                                                          self.rp)
-            else:
-                jointPoses = p.calculateInverseKinematics(self.body_id,
-                                                          self.EndEffectorIndex,
-                                                          pos,
-                                                          lowerLimits=self.ll,
-                                                          upperLimits=self.ul,
-                                                          jointRanges=self.jr,
-                                                          restPoses=self.rp)
-        else:
-            if (self.useOrientation == 1):
-                jointPoses = p.calculateInverseKinematics(self.body_id,
-                                                          self.EndEffectorIndex,
-                                                          pos,
-                                                          orn,
-                                                          jointDamping=self.jd)
-            else:
-                jointPoses = p.calculateInverseKinematics(
-                    self.body_id, self.EndEffectorIndex, pos)
-
-        # Eprint("jointPoses")
-        # print(jointPoses)
-        # print("self.EndEffectorIndex")
-        # print(self.EndEffectorIndex)
-        if (self.useSimulation):
-            for i in range(self.EndEffectorIndex + 1):
-                # print(i)
-                p.setJointMotorControl2(bodyUniqueId=self.body_id,
-                                        jointIndex=i,
-                                        controlMode=p.POSITION_CONTROL,
-                                        targetPosition=jointPoses[i],
-                                        targetVelocity=0,
-                                        force=self.maxForce,
-                                        maxVelocity=self.maxVelocity,
-                                        positionGain=0.3,
-                                        velocityGain=1)
-        else:
-            # reset the joint state (ignoring all dynamics, not recommended to use during simulation)
-            for i in range(self.numJoints):
-                p.resetJointState(self.body_id, i, jointPoses[i])
-        # fingers
-        p.setJointMotorControl2(self.body_id,
-                                7,
-                                p.POSITION_CONTROL,
-                                targetPosition=self.endEffectorAngle,
-                                force=self.maxForce)
-        p.setJointMotorControl2(self.body_id,
-                                8,
-                                p.POSITION_CONTROL,
-                                targetPosition=-fingerAngle,
-                                force=self.fingerAForce)
-        p.setJointMotorControl2(self.body_id,
-                                11,
-                                p.POSITION_CONTROL,
-                                targetPosition=fingerAngle,
-                                force=self.fingerBForce)
-
-        p.setJointMotorControl2(self.body_id,
-                                10,
-                                p.POSITION_CONTROL,
-                                targetPosition=0,
-                                force=self.fingerTipForce)
-        p.setJointMotorControl2(self.body_id,
-                                13,
-                                p.POSITION_CONTROL,
-                                targetPosition=0,
-                                force=self.fingerTipForce)
-
-        p.stepSimulation()
-
-    def test(self):
-        state = p.getLinkState(self.body_id, self.GripperIndex)
-        pos = state[0]
-        orn = state[1]
-
-        jointPoses = p.calculateInverseKinematics(self.body_id,
-                                                  self.EndEffectorIndex,
-                                                  pos,
-                                                  orn,
-                                                  jointDamping=self.jd)
-        pos = state[4]
-        orn = state[5]
-
-        jointPoses_2 = p.calculateInverseKinematics(self.body_id,
-                                                    self.EndEffectorIndex,
-                                                    pos,
-                                                    orn,
-                                                    jointDamping=self.jd)
-
-        joint_list = []
-        for i in self.motor_indices:
-            state_1 = p.getJointInfo(self.body_id, i)
-            state_2 = p.getJointState(self.body_id, i)
-            joint_list.append(state_2[0])
-        a = 1
-
-
-class KukaDirect(KukaBase):
-    def __init__(self, urdf_root_path=pybullet_data.getDataPath(),
-                 time_step=0.01):
-        super().__init__(urdf_root_path, time_step)
-
-    def get_state(self):
-        info = {}
-        observation = []
-        for j_i in self.motor_indices:
-            state = p.getJointState(self.BodyId, j_i)
-            observation.append(state[0])
-
-        info['motor_indeices'] = self.motor_indices
-        info['joint_poses'] = observation
-
-        return info
-
-    def apply_action(self, action):
-        jointPoses = self.get_state()
-        for c_i, cmd in enumerate(action):
-            jointPoses[c_i] += cmd
-            motor = self.motorIndices[c_i]
-            p.setJointMotorControl2(bodyUniqueId=self.BodyId,
-                                    jointIndex=motor,
-                                    controlMode=p.POSITION_CONTROL,
-                                    targetPosition=jointPoses[c_i],
-                                    targetVelocity=0,
-                                    force=self.maxForce,
-                                    maxVelocity=self.maxVelocity,
-                                    positionGain=0.3,
-                                    velocityGain=1)
-
-        p.stepSimulation()
+# class KukaInverseKinematics(KukaBase):
+#     def __init__(self, urdf_root_path=pybullet_data.getDataPath(),
+#                  time_step=0.01, action_dim=5):
+#         super().__init__(urdf_root_path, time_step, action_dim)
+#
+#     def get_state(self):
+#         info = {}
+#         state = p.getLinkState(self.body_id, self.GripperIndex)
+#         #pos = state[0]
+#         #orn = state[1]
+#         pos = state[4]
+#         orn = state[5]
+#         euler = p.getEulerFromQuaternion(orn)
+#
+#         info['endeffector_pos'] = list(pos)
+#         info['endeffector_euler'] = list(euler)
+#
+#         return info
+#
+#     def get_observation_dim(self):
+#         state = self.get_state()
+#         return len(state)
+#
+#     def apply_action(self, action):
+#
+#         dx = action[0]
+#         dy = action[1]
+#         dz = action[2]
+#         da = action[3]
+#         fingerAngle = action[4]
+#
+#         state = p.getLinkState(self.body_id, self.EndEffectorIndex)
+#         #actualEndEffectorPos = state[0]
+#         #print("pos[2] (getLinkState(EndEffectorIndex)")
+#         # print(actualEndEffectorPos[2])
+#
+#         self.endEffectorPos = list(state[4])
+#
+#         self.endEffectorPos[0] = self.endEffectorPos[0] + dx
+#         # if (self.endEffectorPos[0] > 0.65):
+#         #  self.endEffectorPos[0] = 0.65
+#         # if (self.endEffectorPos[0] < 0.50):
+#         #  self.endEffectorPos[0] = 0.50
+#         self.endEffectorPos[1] = self.endEffectorPos[1] + dy
+#         # if (self.endEffectorPos[1] < -0.17):
+#         #  self.endEffectorPos[1] = -0.17
+#         # if (self.endEffectorPos[1] > 0.22):
+#         #  self.endEffectorPos[1] = 0.22
+#
+#         #print ("self.endEffectorPos[2]")
+#         #print (self.endEffectorPos[2])
+#         # print("actualEndEffectorPos[2]")
+#         # print(actualEndEffectorPos[2])
+#         # if (dz<0 or actualEndEffectorPos[2]<0.5):
+#         self.endEffectorPos[2] = self.endEffectorPos[2] + dz
+#
+#         self.endEffectorAngle = self.endEffectorAngle + da
+#         pos = self.endEffectorPos
+#         orn = p.getQuaternionFromEuler([0, -math.pi, 0])  # -math.pi,yaw])
+#         if (self.useNullSpace == 1):
+#             if (self.useOrientation == 1):
+#                 jointPoses = p.calculateInverseKinematics(self.body_id,
+#                                                           self.EndEffectorIndex,
+#                                                           pos,
+#                                                           orn, self.ll,
+#                                                           self.ul, self.jr,
+#                                                           self.rp)
+#             else:
+#                 jointPoses = p.calculateInverseKinematics(self.body_id,
+#                                                           self.EndEffectorIndex,
+#                                                           pos,
+#                                                           lowerLimits=self.ll,
+#                                                           upperLimits=self.ul,
+#                                                           jointRanges=self.jr,
+#                                                           restPoses=self.rp)
+#         else:
+#             if (self.useOrientation == 1):
+#                 jointPoses = p.calculateInverseKinematics(self.body_id,
+#                                                           self.EndEffectorIndex,
+#                                                           pos,
+#                                                           orn,
+#                                                           jointDamping=self.jd)
+#             else:
+#                 jointPoses = p.calculateInverseKinematics(
+#                     self.body_id, self.EndEffectorIndex, pos)
+#
+#         # Eprint("jointPoses")
+#         # print(jointPoses)
+#         # print("self.EndEffectorIndex")
+#         # print(self.EndEffectorIndex)
+#         if (self.useSimulation):
+#             for i in range(self.EndEffectorIndex + 1):
+#                 # print(i)
+#                 p.setJointMotorControl2(bodyUniqueId=self.body_id,
+#                                         jointIndex=i,
+#                                         controlMode=p.POSITION_CONTROL,
+#                                         targetPosition=jointPoses[i],
+#                                         targetVelocity=0,
+#                                         force=self.maxForce,
+#                                         maxVelocity=self.maxVelocity,
+#                                         positionGain=0.3,
+#                                         velocityGain=1)
+#         else:
+#             # reset the joint state (ignoring all dynamics, not recommended to use during simulation)
+#             for i in range(self.numJoints):
+#                 p.resetJointState(self.body_id, i, jointPoses[i])
+#         # fingers
+#         p.setJointMotorControl2(self.body_id,
+#                                 7,
+#                                 p.POSITION_CONTROL,
+#                                 targetPosition=self.endEffectorAngle,
+#                                 force=self.maxForce)
+#         p.setJointMotorControl2(self.body_id,
+#                                 8,
+#                                 p.POSITION_CONTROL,
+#                                 targetPosition=-fingerAngle,
+#                                 force=self.fingerAForce)
+#         p.setJointMotorControl2(self.body_id,
+#                                 11,
+#                                 p.POSITION_CONTROL,
+#                                 targetPosition=fingerAngle,
+#                                 force=self.fingerBForce)
+#
+#         p.setJointMotorControl2(self.body_id,
+#                                 10,
+#                                 p.POSITION_CONTROL,
+#                                 targetPosition=0,
+#                                 force=self.fingerTipForce)
+#         p.setJointMotorControl2(self.body_id,
+#                                 13,
+#                                 p.POSITION_CONTROL,
+#                                 targetPosition=0,
+#                                 force=self.fingerTipForce)
+#
+#         p.stepSimulation()
+#
+#     def test(self):
+#         state = p.getLinkState(self.body_id, self.GripperIndex)
+#         pos = state[0]
+#         orn = state[1]
+#
+#         jointPoses = p.calculateInverseKinematics(self.body_id,
+#                                                   self.EndEffectorIndex,
+#                                                   pos,
+#                                                   orn,
+#                                                   jointDamping=self.jd)
+#         pos = state[4]
+#         orn = state[5]
+#
+#         jointPoses_2 = p.calculateInverseKinematics(self.body_id,
+#                                                     self.EndEffectorIndex,
+#                                                     pos,
+#                                                     orn,
+#                                                     jointDamping=self.jd)
+#
+#         joint_list = []
+#         for i in self.motor_indices:
+#             state_1 = p.getJointInfo(self.body_id, i)
+#             state_2 = p.getJointState(self.body_id, i)
+#             joint_list.append(state_2[0])
+#         a = 1
+#
+#
+# class KukaDirect(KukaBase):
+#     def __init__(self, urdf_root_path=pybullet_data.getDataPath(),
+#                  time_step=0.01):
+#         super().__init__(urdf_root_path, time_step)
+#
+#     def get_state(self):
+#         info = {}
+#         observation = []
+#         for j_i in self.motor_indices:
+#             state = p.getJointState(self.BodyId, j_i)
+#             observation.append(state[0])
+#
+#         info['motor_indeices'] = self.motor_indices
+#         info['joint_poses'] = observation
+#
+#         return info
+#
+#     def apply_action(self, action):
+#         jointPoses = self.get_state()
+#         for c_i, cmd in enumerate(action):
+#             jointPoses[c_i] += cmd
+#             motor = self.motorIndices[c_i]
+#             p.setJointMotorControl2(bodyUniqueId=self.BodyId,
+#                                     jointIndex=motor,
+#                                     controlMode=p.POSITION_CONTROL,
+#                                     targetPosition=jointPoses[c_i],
+#                                     targetVelocity=0,
+#                                     force=self.maxForce,
+#                                     maxVelocity=self.maxVelocity,
+#                                     positionGain=0.3,
+#                                     velocityGain=1)
+#
+#         p.stepSimulation()
