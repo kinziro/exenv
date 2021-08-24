@@ -5,6 +5,7 @@ from .observation_filters import (GetTargetPosAndOrn,
                                   NormalizeRelativeValue,
                                   FormatKukaInverseKinematics,
                                   LiftBlockReward)
+from ..meshes import get_mesh_dir_path
 from pkg_resources import parse_version
 import pybullet_data
 import random
@@ -120,6 +121,7 @@ class BaseTask(gym.Env):
 class LiftBlock(BaseTask):
     def __init__(self,
                  robot,
+                 block_pos_offsets=(0.15, 0.15),
                  urdf_root=pybullet_data.getDataPath(),
                  action_repeat=1,
                  time_step=1./240.,
@@ -134,6 +136,7 @@ class LiftBlock(BaseTask):
         self._cam_pitch = -20
         #self._lim_z = 0.28
         self._lim_z = 0.25
+        self.block_pos_offsets = block_pos_offsets
 
         self.seed()
 
@@ -144,7 +147,7 @@ class LiftBlock(BaseTask):
 
         # set block
         self.block_id, self.init_block_pos, self.init_block_orn \
-            = self.load_block()
+            = self.load_block(block_pos_offsets, robot)
         self._attempted_grasp = False
 
         # set filters
@@ -174,14 +177,15 @@ class LiftBlock(BaseTask):
         self._attempted_grasp = False
 
         # reset block
-        self.init_block_pos, self.init_block_orn = self.reset_block()
+        self.init_block_pos, self.init_block_orn \
+            = self.reset_block(self.block_pos_offsets)
 
         # reset super class
         obs = super().reset()
 
         return obs
 
-    def cal_block_pos_and_orn(self):
+    def cal_block_pos_and_orn(self, pos_offsets, robot=None):
         # if self.action_dim == 1:
         #     xpos = 0.55 + 0.12 * (2 * random.random() - 1)
         #     ypos = 0
@@ -194,31 +198,43 @@ class LiftBlock(BaseTask):
         #     xpos = 0.55 + 0.12 * (2 * random.random() - 1)
         #     ypos = 0 + 0.2 * (2 * random.random() - 1)
         #     ang = -np.pi * 0.5 + np.pi * random.random()
+        if robot is not None:
+            _robot = robot
+        else:
+            _robot = self._robot
 
-        # x = 0.55
-        # y = 0
-        z = 0.02
-        x = 0.7
-        y = 0.15
-        # z = 0.02
+        state = p.getLinkState(_robot.body_id,
+                               _robot.endeffector_index)
+
+        pos = list(state[4])
+        #pos[2] = 0.02
+        pos[2] = 0.1
+
+        # ブロックをずらす
+        pos[0] += pos_offsets[0]
+        pos[1] += pos_offsets[1]
+
         ang = -np.pi * 0.5
 
-        pos = (x, y, z)
         orn = p.getQuaternionFromEuler([0, 0, ang])
 
-        return pos, orn
+        return tuple(pos), orn
 
-    def load_block(self):
-        pos, orn = self.cal_block_pos_and_orn()
+    def load_block(self, pos_offsets, robot=None):
+        pos, orn = self.cal_block_pos_and_orn(pos_offsets, robot)
 
-        block_id = p.loadURDF(os.path.join(self._urdf_root, "block.urdf"),
+        block_id = p.loadURDF(os.path.join(get_mesh_dir_path(),
+                                           "objects/cube_small.urdf"),
                               pos[0], pos[1], pos[2],
                               orn[0], orn[1], orn[2], orn[3])
+        # block_id = p.loadURDF(os.path.join(self._urdf_root, "block.urdf"),
+        #                       pos[0], pos[1], pos[2],
+        #                       orn[0], orn[1], orn[2], orn[3])
 
         return block_id, pos, orn
 
-    def reset_block(self):
-        pos, orn = self.cal_block_pos_and_orn()
+    def reset_block(self, pos_offsets, robot=None):
+        pos, orn = self.cal_block_pos_and_orn(pos_offsets, robot)
 
         p.resetBasePositionAndOrientation(self.block_id, pos, orn)
 
