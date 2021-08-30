@@ -1,3 +1,4 @@
+from gym.utils.seeding import _int_list_from_bigint
 from ..urdf import get_urdf_dir_path
 from .common import RobotBase
 import pybullet_data
@@ -132,11 +133,12 @@ class Ur5Base(RobotBase):
         # init_joint_pos = [
         #     0, 0, -1.6, -0.75, 0, 0,
         # ]
+        self.init_finger_angle = 0.03
         init_joint_pos = [0, np.pi, -0.5*np.pi,
                           -0.5*np.pi, -0.5*np.pi,
-                          0.5 * np.pi, 0.012000000476837159,
-                          -0.012000000476837159]
-        self.init_finger_angle = 0.012000000476837159
+                          0.5 * np.pi, self.init_finger_angle,
+                          -self.init_finger_angle]
+        #self.init_finger_angle = 0.012000000476837159
         # init_joint_pos = [0, np.pi, -1.9,
         #                   -1.4, -0.4*np.pi,
         #                   0.5*np.pi, 0.012000000476837159,
@@ -196,6 +198,26 @@ class Ur5Base(RobotBase):
     def apply_action(self, action):
         raise NotImplementedError
 
+    def _grasping_action(self, value, threthold,
+                         check_method=lambda v, t: v <= t):
+        ret = False
+        if check_method(value, threthold):
+            finger_angle = self.init_finger_angle
+            for _ in range(500):
+                grasp_action = [0, 0, 0, 0, finger_angle]
+                self.apply_action(grasp_action)
+                finger_angle -= self.init_finger_angle / 100.
+                if finger_angle < 0:
+                    finger_angle = 0
+
+            for _ in range(250):
+                grasp_action = [0, 0, 0.002, 0, finger_angle]
+                self.apply_action(grasp_action)
+
+            ret = True
+
+        return ret
+
 
 class Ur5InverseKinematics(Ur5Base):
     def __init__(self, urdf_root_path=pybullet_data.getDataPath(),
@@ -246,6 +268,10 @@ class Ur5InverseKinematics(Ur5Base):
                                                   orn, self.ll,
                                                   self.ul, self.jr,
                                                   self.rp)
+        # ハンドを開いておく
+        jointPoses = list(jointPoses)
+        jointPoses[6] = -self.init_finger_angle
+        jointPoses[7] = self.init_finger_angle
 
         self._set_robot_joint_pos(self.motor_indices[:self.n_robot_joints],
                                   jointPoses[:self.n_robot_joints])

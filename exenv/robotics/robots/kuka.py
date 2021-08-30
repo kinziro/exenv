@@ -42,11 +42,6 @@ class KukaBase(RobotBase):
         n_robot_joints = 7
         self.robot_base_pos = (-0.1, 0, 0.07)
 
-        self.init_endeffector_pos = [0.537, 0.0, 0.5]
-        self.init_endeffector_orn = p.getQuaternionFromEuler([0, -math.pi, 0])
-        self.init_endeffector_angle = 0
-        self.init_finger_angle = 0.3
-
         # init_joint_positions = [
         #     0.006418, 0.413184, -0.011401, -1.589317, 0.005379, 1.137684,
         #     -0.006539, 0.000048,
@@ -58,6 +53,14 @@ class KukaBase(RobotBase):
             = self._make_robot(body_path, self.robot_base_pos)
         endeffector_index = motor_indices[6]
         self.gripper_index = motor_indices[7]
+
+        # ロボットの初期情報
+        state = p.getLinkState(body_id,
+                               endeffector_index)
+        self.init_endeffector_pos = tuple(state[4])
+        self.init_endeffector_orn = p.getQuaternionFromEuler([0, -math.pi, 0])
+        self.init_endeffector_angle = 0
+        self.init_finger_angle = 0.3
 
         # オートで計算したいが変な体勢から始まるため、無理やり、ロボットの初期の姿勢を作る
         init_joint_pos = [
@@ -73,12 +76,7 @@ class KukaBase(RobotBase):
         super().__init__(body_id, motor_indices[:n_robot_joints],
                          init_joint_pos[:n_robot_joints],
                          endeffector_index,
-                         self.init_endeffector_pos,
-                         self.init_endeffector_orn,
                          time_step, action_dim)
-
-        self._reset_hand_joint_pos(self.init_endeffector_angle,
-                                   self.init_finger_angle)
 
     def _reset_hand_joint_pos(self, endeffector_angle, finger_angle):
         # fingers
@@ -131,10 +129,39 @@ class KukaBase(RobotBase):
 
         self._reset_hand_joint_pos(self.init_endeffector_angle,
                                    self.init_finger_angle)
+
+        # 初期情報
+        state = p.getLinkState(self.body_id,
+                               self.endeffector_index)
+        self.init_endeffector_pos = tuple(state[4])
+        self.init_endeffector_orn = p.getQuaternionFromEuler([0, -math.pi, 0])
+        self.init_endeffector_angle = 0
+
+        # 現在情報
         self.endeffector_angle = self.init_endeffector_angle
 
     def apply_action(self, action):
         raise NotImplementedError
+
+    def _grasping_action(self, value, threthold,
+                         check_method=lambda v, t: v <= t):
+        ret = False
+        if check_method(value, threthold):
+            finger_angle = self.init_finger_angle
+            for _ in range(500):
+                grasp_action = [0, 0, 0, 0, finger_angle]
+                self.apply_action(grasp_action)
+                finger_angle -= self.init_finger_angle / 100.
+                if finger_angle < 0:
+                    finger_angle = 0
+
+            for _ in range(250):
+                grasp_action = [0, 0, 0.002, 0, finger_angle]
+                self.apply_action(grasp_action)
+
+            ret = True
+
+        return ret
 
 
 class KukaInverseKinematics(KukaBase):

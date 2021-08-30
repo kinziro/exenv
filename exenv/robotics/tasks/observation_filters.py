@@ -77,7 +77,9 @@ class LiftBlockReward:
             reward = reward + 10000
             print("successfully grasped a block!!!")
         else:
-            reward1 = 3 - (xy_distance * 10)
+            # reward1 = 3 - (xy_distance * 10)
+            reward1 = 0
+
             # reward2 = 2 - abs(a_diff)
             # reward = reward1 + reward2
             reward = reward1

@@ -1,3 +1,4 @@
+from numpy.core.shape_base import block
 from .action_filters import FormatInverseKinematics
 from .observation_filters import (GetTargetPosAndOrn,
                                   CalEndEffectorRelativePosition,
@@ -134,8 +135,8 @@ class LiftBlock(BaseTask):
         self._cam_yaw = 120
         # self._cam_pitch = -40
         self._cam_pitch = -20
-        #self._lim_z = 0.28
-        self._lim_z = 0.25
+        self._lim_z = 0.28
+        #self._lim_z = 0.1
         self.block_pos_offsets = block_pos_offsets
 
         self.seed()
@@ -146,8 +147,11 @@ class LiftBlock(BaseTask):
                    [0.000000, 0.000000, 0.0, 1.0])
 
         # set block
+        block_base_pos \
+            = np.array(robot.init_endeffector_pos)[:2] \
+            + np.array(self.block_pos_offsets)
         self.block_id, self.init_block_pos, self.init_block_orn \
-            = self.load_block(block_pos_offsets, robot)
+            = self.load_block(block_base_pos)
         self._attempted_grasp = False
 
         # set filters
@@ -164,7 +168,7 @@ class LiftBlock(BaseTask):
                          action_repeat, time_step, max_steps)
 
         observation_high \
-            = np.array([200, 200, 3.2])
+            = np.array([200, 200, 200])
         action_high = np.array([1] * self.action_dim)
         self.action_space = spaces.Box(-action_high, action_high,
                                        shape=(self.action_dim,))
@@ -177,15 +181,18 @@ class LiftBlock(BaseTask):
         self._attempted_grasp = False
 
         # reset block
+        block_base_pos \
+            = np.array(self._robot.init_endeffector_pos)[:2] \
+            + np.array(self.block_pos_offsets)
         self.init_block_pos, self.init_block_orn \
-            = self.reset_block(self.block_pos_offsets)
+            = self.reset_block(block_base_pos)
 
         # reset super class
         obs = super().reset()
 
         return obs
 
-    def cal_block_pos_and_orn(self, pos_offsets, robot=None):
+    def cal_block_pos_and_orn(self, base_pos):
         # if self.action_dim == 1:
         #     xpos = 0.55 + 0.12 * (2 * random.random() - 1)
         #     ypos = 0
@@ -198,21 +205,10 @@ class LiftBlock(BaseTask):
         #     xpos = 0.55 + 0.12 * (2 * random.random() - 1)
         #     ypos = 0 + 0.2 * (2 * random.random() - 1)
         #     ang = -np.pi * 0.5 + np.pi * random.random()
-        if robot is not None:
-            _robot = robot
-        else:
-            _robot = self._robot
 
-        state = p.getLinkState(_robot.body_id,
-                               _robot.endeffector_index)
-
-        pos = list(state[4])
+        pos = list(base_pos)
         #pos[2] = 0.02
-        pos[2] = 0.1
-
-        # ブロックをずらす
-        pos[0] += pos_offsets[0]
-        pos[1] += pos_offsets[1]
+        pos += [0.1]
 
         ang = -np.pi * 0.5
 
@@ -220,8 +216,8 @@ class LiftBlock(BaseTask):
 
         return tuple(pos), orn
 
-    def load_block(self, pos_offsets, robot=None):
-        pos, orn = self.cal_block_pos_and_orn(pos_offsets, robot)
+    def load_block(self, base_pos):
+        pos, orn = self.cal_block_pos_and_orn(base_pos)
 
         block_id = p.loadURDF(os.path.join(get_mesh_dir_path(),
                                            "objects/cube_small.urdf"),
@@ -233,8 +229,8 @@ class LiftBlock(BaseTask):
 
         return block_id, pos, orn
 
-    def reset_block(self, pos_offsets, robot=None):
-        pos, orn = self.cal_block_pos_and_orn(pos_offsets, robot)
+    def reset_block(self, base_pos):
+        pos, orn = self.cal_block_pos_and_orn(base_pos)
 
         p.resetBasePositionAndOrientation(self.block_id, pos, orn)
 
@@ -256,22 +252,8 @@ class LiftBlock(BaseTask):
         # If we are close to the bin, attempt grasp.
         end_effector_pos = info["endeffector_pos"]
 
-        # if end_effector_pos[2] <= 0.0925:
-        # if end_effector_pos[2] <= 0.28:
-        if end_effector_pos[2] <= self._lim_z:
-            finger_angle = 0.3
-            for _ in range(500):
-                grasp_action = [0, 0, 0, 0, finger_angle]
-                self._robot.apply_action(grasp_action)
-                finger_angle -= 0.3 / 100.
-                if finger_angle < 0:
-                    finger_angle = 0
-
-            for _ in range(250):
-                grasp_action = [0, 0, 0.002, 0, finger_angle]
-                self._robot.apply_action(grasp_action)
-
-            self._attempted_grasp = True
+        self._attempted_grasp \
+            = self._robot._grasping_action(end_effector_pos[2], self._lim_z)
 
     def render(self, mode="rgb_array", close=False):
         if mode != "rgb_array":
