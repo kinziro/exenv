@@ -8,8 +8,6 @@ class RobotBase:
                  motor_indices,
                  init_robot_joint_pos,
                  endeffector_index,
-                 init_endeffector_pos=None,
-                 init_endeffector_orn=None,
                  time_step=0.01,
                  action_dim=None):
         self.body_id = body_id

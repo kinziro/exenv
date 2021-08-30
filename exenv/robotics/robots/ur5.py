@@ -62,9 +62,6 @@ class Ur5Base(RobotBase):
         body_path = os.path.join(urdf_path, "ur5_arm.urdf")
         # self.robotStartPos = [0.0, 0.0, 0.0]
         # self.robotStartOrn = p.getQuaternionFromEuler([1.885, 1.786, 0.132])
-        self.init_endeffector_angle = 0
-        self.init_endeffector_pos = [0.537, 0.0, 0.5]
-        self.init_endeffector_orn = p.getQuaternionFromEuler([0, -math.pi, 0])
 
         self.lastJointAngle = None
         self.active = False
@@ -160,12 +157,19 @@ class Ur5Base(RobotBase):
         #     body_id, self.endeffector_index, self.init_endeffector_pos,
         #     self.init_endeffector_orn,
         #     jointDamping=self.jd)
+        # ロボットの初期情報
+        state = p.getLinkState(body_id,
+                               endeffector_index)
+        self.init_endeffector_pos = tuple(state[4])
+        #self.init_endeffector_pos = [0.537, 0.0, 0.5]
+        self.init_endeffector_orn = p.getQuaternionFromEuler([0, -math.pi, 0])
+        self.init_endeffector_angle = 0
 
         super().__init__(body_id, motor_indices[:n_robot_joints],
                          init_joint_pos[:n_robot_joints],
                          endeffector_index,
-                         init_endeffector_pos=self.init_endeffector_pos,
-                         init_endeffector_orn=self.init_endeffector_orn,
+                         # init_endeffector_pos=self.init_endeffector_pos,
+                         # init_endeffector_orn=self.init_endeffector_orn,
                          time_step=time_step,
                          action_dim=action_dim)
         # super().__init__(body_id, n_robot_joints,
@@ -190,10 +194,17 @@ class Ur5Base(RobotBase):
                           -finger_angle)
 
     def reset(self):
+        super().reset()
+
+        # 初期情報
+        state = p.getLinkState(self.body_id,
+                               self.endeffector_index)
+        self.init_endeffector_pos = tuple(state[4])
+        self.init_endeffector_orn = p.getQuaternionFromEuler([0, -math.pi, 0])
+        self.init_endeffector_angle = 0
+
         self.endeffector_pos = self.init_endeffector_pos
         self.endeffector_angle = self.init_endeffector_angle
-
-        super().reset()
 
     def apply_action(self, action):
         raise NotImplementedError
