@@ -5,6 +5,7 @@ import os
 class RobotBase:
 
     def __init__(self, body_id,
+                 n_arm_joints,
                  motor_indices,
                  init_robot_joint_pos,
                  endeffector_index,
@@ -13,7 +14,7 @@ class RobotBase:
         self.body_id = body_id
         self.endeffector_index = endeffector_index
         self.motor_indices = motor_indices
-        self.n_robot_joints = len(motor_indices)
+        self.n_arm_joints = n_arm_joints
         self.init_robot_joint_pos = init_robot_joint_pos
         self.time_step = time_step
 
@@ -79,9 +80,9 @@ class RobotBase:
         raise NotImplementedError
 
     def _reset_robot_joint_pos(self, n_joints, joint_positions):
-        for joint_index in range(n_joints):
-            p.resetJointState(self.body_id, joint_index,
-                              joint_positions[joint_index])
+        for j_i in range(n_joints):
+            p.resetJointState(self.body_id, self.motor_indices[j_i],
+                              joint_positions[j_i])
             # p.setJointMotorControl2(self.body_id,
             #                         joint_index,
             #                         p.POSITION_CONTROL,
@@ -90,29 +91,29 @@ class RobotBase:
 
     def _set_robot_joint_pos(self, motor_indices, joint_positions):
         # set init position
-        # for i in range(n_joints):
-        #     # print(i)
-        #     p.setJointMotorControl2(bodyUniqueId=self.body_id,
-        #                             jointIndex=i,
-        #                             controlMode=p.POSITION_CONTROL,
-        #                             targetPosition=joint_positions[i],
-        #                             targetVelocity=0,
-        #                             force=self.max_force,
-        #                             maxVelocity=self.max_velocity,
-        #                             positionGain=0.3,
-        #                             velocityGain=1)
-        l = len(motor_indices)
-        p.setJointMotorControlArray(self.body_id,
-                                    jointIndices=motor_indices,
+        for j_i in range(len(motor_indices)):
+            # print(i)
+            p.setJointMotorControl2(bodyUniqueId=self.body_id,
+                                    jointIndex=motor_indices[j_i],
                                     controlMode=p.POSITION_CONTROL,
-                                    targetPositions=joint_positions,
-                                    targetVelocities=[0]*l,
-                                    forces=[self.max_force]*l,
-                                    positionGains=[0.3]*l,
-                                    velocityGains=[1]*l)
+                                    targetPosition=joint_positions[j_i],
+                                    targetVelocity=0,
+                                    force=self.max_force,
+                                    maxVelocity=self.max_velocity,
+                                    positionGain=0.3,
+                                    velocityGain=1)
+        # l = len(motor_indices)
+        # p.setJointMotorControlArray(self.body_id,
+        #                             jointIndices=motor_indices,
+        #                             controlMode=p.POSITION_CONTROL,
+        #                             targetPositions=joint_positions,
+        #                             targetVelocities=[0]*l,
+        #                             forces=[self.max_force]*l,
+        #                             positionGains=[0.3]*l,
+        #                             velocityGains=[1]*l)
 
     def reset(self):
-        self._reset_robot_joint_pos(self.n_robot_joints,
+        self._reset_robot_joint_pos(self.n_arm_joints,
                                     self.init_robot_joint_pos)
 
     def get_action_dim(self):

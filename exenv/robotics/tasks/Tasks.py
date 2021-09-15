@@ -56,6 +56,7 @@ class BaseTask(gym.Env):
         self._env_step_counter = 0
 
         self._robot.reset()
+
         self.action_dim = self._robot.get_action_dim()
         obs, _, _, _ = self._get_observation()
         self.observation_dim = len(obs)
@@ -77,6 +78,7 @@ class BaseTask(gym.Env):
         # p.resetSimulation()
 
         # reset variable
+        print("env_step_counter", self._env_step_counter)
         self._env_step_counter = 0
 
         # reset robot
@@ -86,6 +88,7 @@ class BaseTask(gym.Env):
         return np.array(obs)
 
     def step(self, action):
+        self._env_step_counter += 1
 
         for action_filter in self._action_filters:
             action = action_filter(action)
@@ -135,7 +138,8 @@ class LiftBlock(BaseTask):
         self._cam_yaw = 120
         # self._cam_pitch = -40
         self._cam_pitch = -20
-        self._lim_z = 0.28
+        self._lim_z = robot.gripper_length + 0.02
+        #self._lim_z = 0.28
         #self._lim_z = 0.1
         self.block_pos_offsets = block_pos_offsets
 
@@ -168,7 +172,7 @@ class LiftBlock(BaseTask):
                          action_repeat, time_step, max_steps)
 
         observation_high \
-            = np.array([200, 200, 200])
+            = np.array([100000, 100000, 100000])
         action_high = np.array([1] * self.action_dim)
         self.action_space = spaces.Box(-action_high, action_high,
                                        shape=(self.action_dim,))

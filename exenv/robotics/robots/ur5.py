@@ -66,7 +66,8 @@ class Ur5Base(RobotBase):
         self.lastJointAngle = None
         self.active = False
 
-        n_robot_joints = 8
+        self.gripper_length = 0.2
+        n_arm_joints = 6
 
         self.robot_base_pos = (0, 0, -0.1)
         self.robot_base_orn = p.getQuaternionFromEuler([0, 0, 3.1])
@@ -75,8 +76,8 @@ class Ur5Base(RobotBase):
         body_id, self.motor_names, motor_indices \
             = self._make_robot(body_path, base_pos=self.robot_base_pos,
                                base_orn=self.robot_base_orn)
-        endeffector_index = motor_indices[7]
-        self.gripper_index = motor_indices[7]
+        endeffector_index = motor_indices[5]
+        self.gripper_index = motor_indices[6]
         # endeffector_index = motor_indices[6]
         # self.gripper_index = motor_indices[6]
 
@@ -130,11 +131,16 @@ class Ur5Base(RobotBase):
         # init_joint_pos = [
         #     0, 0, -1.6, -0.75, 0, 0,
         # ]
-        self.init_finger_angle = 0.03
-        init_joint_pos = [0, np.pi, -0.5*np.pi,
+        self.init_finger_angle = 0.012
+        #self.init_finger_angle = 0.1
+        # init_joint_pos = [0, np.pi, -0.5*np.pi,
+        #                  -0.5*np.pi, -0.5*np.pi,
+        #                  0.5 * np.pi, -self.init_finger_angle,
+        #                  self.init_finger_angle]
+        init_joint_pos = [np.pi, -0.5*np.pi,
                           -0.5*np.pi, -0.5*np.pi,
-                          0.5 * np.pi, self.init_finger_angle,
-                          -self.init_finger_angle]
+                          0.5 * np.pi, 0, -self.init_finger_angle,
+                          self.init_finger_angle]
         #self.init_finger_angle = 0.012000000476837159
         # init_joint_pos = [0, np.pi, -1.9,
         #                   -1.4, -0.4*np.pi,
@@ -165,11 +171,9 @@ class Ur5Base(RobotBase):
         self.init_endeffector_orn = p.getQuaternionFromEuler([0, -math.pi, 0])
         self.init_endeffector_angle = 0
 
-        super().__init__(body_id, motor_indices[:n_robot_joints],
-                         init_joint_pos[:n_robot_joints],
+        super().__init__(body_id, n_arm_joints, motor_indices,
+                         init_joint_pos,
                          endeffector_index,
-                         # init_endeffector_pos=self.init_endeffector_pos,
-                         # init_endeffector_orn=self.init_endeffector_orn,
                          time_step=time_step,
                          action_dim=action_dim)
         # super().__init__(body_id, n_robot_joints,
@@ -179,8 +183,8 @@ class Ur5Base(RobotBase):
         #                  self.init_endeffector_orn,
         #                  time_step, action_dim)
 
-        self._reset_hand_joint_pos(self.init_endeffector_angle,
-                                   self.init_finger_angle)
+        # self._reset_hand_joint_pos(self.init_endeffector_angle,
+        #                            self.init_finger_angle)
 
         state = p.getLinkState(body_id, self.endeffector_index)
         self.init_endeffector_pos = state[4]
@@ -188,13 +192,29 @@ class Ur5Base(RobotBase):
 
     def _reset_hand_joint_pos(self, endeffector_angle, finger_angle):
         # fingers
-        p.resetJointState(self.body_id, 7,
-                          finger_angle)
-        p.resetJointState(self.body_id, 8,
+        p.resetJointState(self.body_id, self.motor_indices[6],
                           -finger_angle)
+        p.resetJointState(self.body_id, self.motor_indices[7],
+                          finger_angle)
+
+    def _set_hand_joint_pos(self, endeffector_angle, finger_angle):
+        # fingers
+        p.setJointMotorControl2(self.body_id,
+                                self.motor_indices[6],
+                                p.POSITION_CONTROL,
+                                targetPosition=-finger_angle,
+                                force=self.max_force)
+
+        p.setJointMotorControl2(self.body_id,
+                                self.motor_indices[7],
+                                p.POSITION_CONTROL,
+                                targetPosition=finger_angle,
+                                force=self.max_force)
 
     def reset(self):
         super().reset()
+        self._reset_hand_joint_pos(self.init_endeffector_angle,
+                                   self.init_finger_angle)
 
         # 初期情報
         state = p.getLinkState(self.body_id,
@@ -205,6 +225,8 @@ class Ur5Base(RobotBase):
 
         self.endeffector_pos = self.init_endeffector_pos
         self.endeffector_angle = self.init_endeffector_angle
+
+        p.stepSimulation()
 
     def apply_action(self, action):
         raise NotImplementedError
@@ -218,8 +240,11 @@ class Ur5Base(RobotBase):
                 grasp_action = [0, 0, 0, 0, finger_angle]
                 self.apply_action(grasp_action)
                 finger_angle -= self.init_finger_angle / 100.
-                if finger_angle < 0:
-                    finger_angle = 0
+                # if finger_angle < 0:
+                #     finger_angle = 0
+                if finger_angle < -0.1:
+                    finger_angle = -0.1
+                finger_angle = -0.1
 
             for _ in range(250):
                 grasp_action = [0, 0, 0.002, 0, finger_angle]
@@ -260,6 +285,7 @@ class Ur5InverseKinematics(Ur5Base):
         dz = action[2]
         da = action[3]
         fingerAngle = action[4]
+        #fingerAngle = self.init_finger_angle
 
         state = p.getLinkState(self.body_id, self.endeffector_index)
 
@@ -281,11 +307,11 @@ class Ur5InverseKinematics(Ur5Base):
                                                   self.rp)
         # ハンドを開いておく
         jointPoses = list(jointPoses)
-        jointPoses[6] = -self.init_finger_angle
-        jointPoses[7] = self.init_finger_angle
+        # jointPoses[6] = -self.init_finger_angle
+        # jointPoses[7] = self.init_finger_angle
 
-        self._set_robot_joint_pos(self.motor_indices[:self.n_robot_joints],
-                                  jointPoses[:self.n_robot_joints])
-        # self._set_hand_joint_pos(self.init_endeffector_angle,
-        #                          fingerAngle)
+        self._set_robot_joint_pos(self.motor_indices[:self.n_arm_joints],
+                                  jointPoses[:self.n_arm_joints])
+        self._set_hand_joint_pos(self.init_endeffector_angle,
+                                 fingerAngle)
         p.stepSimulation()

@@ -39,7 +39,8 @@ class KukaBase(RobotBase):
             0.00001, 0.00001, 0.00001, 0.00001
         ]
 
-        n_robot_joints = 7
+        self.gripper_length = 0.25
+        n_arm_joints = 7
         self.robot_base_pos = (-0.1, 0, 0.07)
 
         # init_joint_positions = [
@@ -73,8 +74,8 @@ class KukaBase(RobotBase):
         #     body_id, self.endeffector_index, self.init_endeffector_pos,
         #     self.init_endeffector_orn,
         #     jointDamping=self.jd)
-        super().__init__(body_id, motor_indices[:n_robot_joints],
-                         init_joint_pos[:n_robot_joints],
+        super().__init__(body_id, n_arm_joints, motor_indices[:n_arm_joints],
+                         init_joint_pos[:n_arm_joints],
                          endeffector_index,
                          time_step, action_dim)
 
@@ -213,8 +214,8 @@ class KukaInverseKinematics(KukaBase):
                                                   self.ul, self.jr,
                                                   self.rp)
 
-        self._set_robot_joint_pos(self.motor_indices[:self.n_robot_joints],
-                                  jointPoses[:self.n_robot_joints])
+        self._set_robot_joint_pos(self.motor_indices[:self.n_arm_joints],
+                                  jointPoses[:self.n_arm_joints])
         self._set_hand_joint_pos(self.init_endeffector_angle,
                                  fingerAngle)
         p.stepSimulation()
